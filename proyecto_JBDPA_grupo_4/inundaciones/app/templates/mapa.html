@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+.wrap{display:grid;grid-template-columns:minmax(0,2fr) minmax(18rem,1fr);gap:1rem;padding:1rem}
+#map{height:75vh;min-height:22rem;border:1px solid var(--borde);border-radius:8px}
+aside{background:var(--blanco);border:1px solid var(--borde);border-radius:8px;padding:1rem;max-height:75vh;overflow:auto}
+ul{list-style:none;margin:.5rem 0;padding:0}
+li{display:flex;align-items:center;gap:.6rem;padding:.45rem .3rem;border-bottom:1px solid var(--borde);cursor:pointer}
+li[aria-selected=true]{background:#e4f0f4}
+.punto{width:.9rem;height:.9rem;border-radius:50%;flex:none}
+.pct{margin-left:auto;font-weight:700}
+@media(max-width:760px){.wrap{grid-template-columns:1fr}#map{height:55vh}}
+</style>
+{% endblock %}
+{% block contenido %}
+<div class="wrap">
+  <div id="map" role="application" aria-label="Mapa de riesgo de inundación"></div>
+  <aside>
+    <label for="dep">Departamento</label>
+    <select id="dep" style="width:100%"><option value="">Elegí uno…</option>
+      {% for d in deps %}<option value="{{ d.id }}">{{ d.nombre }}</option>{% endfor %}
+    </select>
+    <p id="resumen" aria-live="polite">Elegí un departamento para ver el riesgo por barrio.</p>
+    <ul id="lista"></ul>
+    <div id="detalle" aria-live="polite"></div>
+  </aside>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const zona = {{ zona|tojson }};
+const map = L.map('map').setView([-32.8, -56], 7);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '© OpenStreetMap'}).addTo(map);
+const capa = L.layerGroup().addTo(map);
+const $ = id => document.getElementById(id);
+let actual = [];
+
+function el(tag, txt, css) { const e = document.createElement(tag); e.textContent = txt; if (css) e.style.cssText = css; return e; }
+
+function detalle(b) {
+  const d = $('detalle'); d.replaceChildren();
+  d.append(el('h2', b.nombre), el('p', `Probabilidad de inundación: ${b.probabilidad}% (${b.nivel})`));
+  if (!b.terreno) d.append(el('p', 'Todavía no hay datos de terreno para este barrio; el cálculo usa un valor neutro.'));
+  const btn = el('button', 'Esta es mi zona');
+  btn.onclick = async () => {
+    const r = await fetch('/api/zona', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({barrio_id: b.id})});
+    btn.textContent = r.ok ? 'Zona guardada' : 'No se pudo guardar';
+  };
+  d.append(btn);
+  document.querySelectorAll('#lista li').forEach(li => li.setAttribute('aria-selected', li.dataset.id == b.id));
+}
+
+async function cargar(depId, barrioId) {
+  const r = await fetch(`/api/departamentos/${depId}/riesgo`);
+  const d = await r.json();
+  if (!r.ok) { $('resumen').textContent = d.error; return; }
+  actual = d.barrios; capa.clearLayers(); $('lista').replaceChildren(); $('detalle').replaceChildren();
+  $('resumen').textContent = actual.length
+    ? `Lluvia últimos 3 días: ${d.lluvia_pasada_mm} mm · prevista próximos 3 días: ${d.lluvia_prevista_mm} mm`
+    : 'Todavía no hay barrios cargados para este departamento.';
+  map.setView(d.centro, 11);
+  actual.forEach(b => {
+    const c = L.circle([b.lat, b.lon], {radius: 700, color: b.color, fillColor: b.color, fillOpacity: .55}).addTo(capa);
+    c.bindTooltip(el('span', `${b.nombre}: ${b.probabilidad}%`)); c.on('click', () => detalle(b));
+    const li = document.createElement('li'); li.tabIndex = 0; li.dataset.id = b.id;
+    li.append(el('span', '', `background:${b.color}`), el('span', b.nombre), el('span', `${b.probabilidad}% · ${b.nivel}`));
+    li.children[0].className = 'punto'; li.children[2].className = 'pct';
+    li.onclick = () => { map.setView([b.lat, b.lon], 13); detalle(b); };
+    li.onkeydown = e => { if (e.key === 'Enter') li.onclick(); };
+    $('lista').append(li);
+  });
+  const sel = actual.find(b => b.id === barrioId); if (sel) detalle(sel);
+}
+
+$('dep').onchange = e => e.target.value && cargar(e.target.value);
+if (zona) { $('dep').value = zona.departamento_id; cargar(zona.departamento_id, zona.barrio_id); }
+</script>
+{% endblock %}

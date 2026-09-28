@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block contenido %}
+<main style="max-width:26rem;margin:2rem auto;padding:0 1rem">
+  <h1>{{ "Crear cuenta" if registro else "Iniciar sesión" }}</h1>
+  <form method="post" style="display:grid;gap:.9rem">
+    {% if registro %}<label>Nombre<br><input name="nombre" required autocomplete="name" style="width:100%"></label>{% endif %}
+    <label>Email<br><input type="email" name="email" required autocomplete="email" style="width:100%"></label>
+    <label>Contraseña<br><input type="password" name="password" required minlength="8"
+      autocomplete="{{ 'new-password' if registro else 'current-password' }}" style="width:100%"></label>
+    <button>{{ "Crear cuenta" if registro else "Entrar" }}</button>
+  </form>
+  <p>{% if registro %}¿Ya tenés cuenta? <a href="{{ url_for('login') }}">Iniciá sesión</a>
+     {% else %}¿No tenés cuenta? <a href="{{ url_for('registro') }}">Registrate</a>{% endif %}</p>
+</main>
+{% endblock %}
