@@ -3,5 +3,5 @@ Python: lo utilizaremos para desarrollar la lógica y el funcionamiento principa
 Flask: lo utilizaremos para crear y gestionar la aplicación web utilizando Python.
 HTML: lo utilizaremos para crear la estructura de las páginas que verá el usuario.
 MySQL: lo utilizaremos para almacenar los datos del sistema, como usuarios, zonas y registros.
-API meteorológica: la utilizaremos para obtener información sobre las condiciones climáticas y las lluvias.
+API INUMET: la utilizaremos para obtener información sobre las condiciones climáticas y las lluvias.
 API de mapas: la utilizaremos para incorporar el mapa interactivo de las zonas.
