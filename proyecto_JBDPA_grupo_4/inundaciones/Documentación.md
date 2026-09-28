@@ -45,8 +45,7 @@
 - **Sistema:** procesa la información climática, calcula el riesgo y muestra los resultados.
 - **API de clima/INUMET:** proporciona los datos necesarios sobre lluvia y condiciones climáticas.
 - **API de mapas:** proporciona el mapa utilizado para visualizar las zonas según su nivel de riesgo.
-| Nº   | Caso de uso                                 | Descripción                                                                                                                                   |
-| ---- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nº   | Caso de uso                                 | Descripción                                                                                                                             
 | CU01 | **Registrar usuario**                       | El usuario crea una cuenta ingresando sus datos.                                                                                              |
 | CU02 | **Iniciar sesión**                          | El usuario ingresa sus credenciales para acceder al sistema.                                                                                  |
 | CU03 | **Seleccionar ubicación**                   | El usuario selecciona el departamento y la ciudad donde vive.                                                                                 |
