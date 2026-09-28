@@ -1,5 +1,5 @@
 # Requisitos funcionales
-
+ 
 - **Registro de usuarios**
 - **Inicio de sesión**
 - **Gestión del perfil**
