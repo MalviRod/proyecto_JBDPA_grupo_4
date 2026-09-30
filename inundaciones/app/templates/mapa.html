@@ -1,0 +1,558 @@
+{% extends "base.html" %}
+
+{% block titulo %}
+INNUVORA · Mapa de riesgo
+{% endblock %}
+
+{% block head %}
+
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<style>
+
+    .map-page {
+        padding: 1.2rem;
+
+        max-width: 1500px;
+        margin: auto;
+    }
+
+    .map-header {
+        margin-bottom: 1rem;
+    }
+
+    .map-header h1 {
+        margin: 0;
+        font-size: clamp(1.7rem, 4vw, 2.5rem);
+    }
+
+    .map-header p {
+        margin: .3rem 0 0;
+        color: var(--texto-suave);
+    }
+
+    .map-layout {
+        display: grid;
+
+        grid-template-columns:
+            minmax(0, 2fr)
+            minmax(280px, .8fr);
+
+        gap: 1rem;
+    }
+
+    #map {
+        height: 72vh;
+        min-height: 450px;
+
+        border: 1px solid var(--borde);
+        border-radius: 20px;
+
+        overflow: hidden;
+
+        box-shadow: var(--sombra);
+    }
+
+    .map-panel {
+        background: var(--superficie);
+
+        border: 1px solid var(--borde);
+        border-radius: 20px;
+
+        padding: 1.2rem;
+
+        max-height: 72vh;
+        overflow: auto;
+
+        box-shadow: var(--sombra);
+    }
+
+    .map-panel label {
+        display: block;
+        margin-bottom: .4rem;
+        font-weight: 700;
+    }
+
+    .map-panel select {
+        width: 100%;
+
+        padding: .75rem;
+
+        border: 1px solid var(--borde);
+        border-radius: 10px;
+
+        background: var(--fondo);
+        color: var(--texto);
+    }
+
+    #resumen {
+        padding: .8rem;
+
+        background: var(--azul-claro);
+        border-radius: 12px;
+
+        color: var(--texto);
+    }
+
+    #lista {
+        list-style: none;
+
+        margin: 1rem 0;
+        padding: 0;
+    }
+
+    #lista li {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+
+        padding: .75rem .5rem;
+
+        border-bottom: 1px solid var(--borde);
+
+        cursor: pointer;
+        border-radius: 8px;
+    }
+
+    #lista li:hover,
+    #lista li[aria-selected="true"] {
+        background: var(--azul-claro);
+    }
+
+    .punto {
+        width: 12px;
+        height: 12px;
+
+        flex: none;
+
+        border-radius: 50%;
+    }
+
+    .pct {
+        margin-left: auto;
+        font-weight: 700;
+    }
+
+    #detalle {
+        padding-top: 1rem;
+    }
+
+    #detalle button {
+        width: 100%;
+        margin-top: .5rem;
+    }
+
+    @media (max-width: 850px) {
+
+        .map-layout {
+            grid-template-columns: 1fr;
+        }
+
+        #map {
+            height: 55vh;
+            min-height: 350px;
+        }
+
+        .map-panel {
+            max-height: none;
+        }
+
+    }
+
+</style>
+
+{% endblock %}
+
+
+{% block contenido %}
+
+<div class="map-page">
+
+    <header class="map-header">
+
+        <h1>
+            Mapa de riesgo
+        </h1>
+
+        <p>
+            Consultá el riesgo estimado de inundación por barrio.
+        </p>
+
+    </header>
+
+
+    <div class="map-layout">
+
+        <div
+            id="map"
+            role="application"
+            aria-label="Mapa de riesgo de inundación"
+        ></div>
+
+
+        <aside class="map-panel">
+
+            <label for="dep">
+                Departamento
+            </label>
+
+            <select id="dep">
+
+                <option value="">
+                    Elegí un departamento…
+                </option>
+
+                {% for d in deps %}
+
+                    <option value="{{ d.id }}">
+                        {{ d.nombre }}
+                    </option>
+
+                {% endfor %}
+
+            </select>
+
+
+            <p
+                id="resumen"
+                aria-live="polite"
+            >
+                Elegí un departamento para ver el riesgo por barrio.
+            </p>
+
+
+            <ul id="lista"></ul>
+
+
+            <div
+                id="detalle"
+                aria-live="polite"
+            ></div>
+
+        </aside>
+
+    </div>
+
+</div>
+
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+const zona = {{ zona|tojson }};
+
+const CSRF = document
+    .querySelector('meta[name="csrf-token"]')
+    .content;
+
+async function postJSON(url, datos) {
+
+    return fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': CSRF
+        },
+        body: JSON.stringify(datos)
+    });
+
+}
+
+const map = L.map('map').setView([-32.8, -56], 7);
+
+L.tileLayer(
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+        attribution: '© OpenStreetMap'
+    }
+).addTo(map);
+
+const capa = L.layerGroup().addTo(map);
+
+const $ = id => document.getElementById(id);
+
+let actual = [];
+
+
+function el(tag, txt, css) {
+
+    const e = document.createElement(tag);
+
+    e.textContent = txt;
+
+    if (css) {
+        e.style.cssText = css;
+    }
+
+    return e;
+}
+
+
+function detalle(b) {
+
+    const d = $('detalle');
+
+    d.replaceChildren();
+
+    d.append(
+        el('h2', b.nombre),
+        el(
+            'p',
+            `Probabilidad de inundación: ${b.probabilidad}% (${b.nivel})`
+        )
+    );
+
+
+    if (!b.terreno) {
+
+        d.append(
+            el(
+                'p',
+                'Todavía no hay datos de terreno para este barrio; el cálculo utiliza un valor neutro.'
+            )
+        );
+
+    }
+
+
+    const btn = el(
+        'button',
+        'Esta es mi zona'
+    );
+
+
+    btn.onclick = async () => {
+
+        try {
+
+            const r = await postJSON(
+                '/api/zona',
+                { barrio_id: b.id }
+            );
+
+            btn.textContent =
+                r.ok
+                    ? 'Zona guardada ✓'
+                    : 'No se pudo guardar';
+
+        } catch (e) {
+
+            btn.textContent = 'No se pudo guardar';
+
+        }
+
+    };
+
+
+    const btnAlerta = el(
+        'button',
+        'Avisarme si el riesgo supera 50%'
+    );
+
+
+    btnAlerta.onclick = async () => {
+
+        try {
+
+            const r = await postJSON(
+                '/api/alertas',
+                { barrio_id: b.id, umbral: 50 }
+            );
+
+            btnAlerta.textContent =
+                r.ok
+                    ? 'Alerta activada ✓ (cambiala en Alertas)'
+                    : 'No se pudo activar';
+
+        } catch (e) {
+
+            btnAlerta.textContent = 'No se pudo activar';
+
+        }
+
+    };
+
+
+    d.append(btn, btnAlerta);
+
+
+    document
+        .querySelectorAll('#lista li')
+        .forEach(li => {
+
+            li.setAttribute(
+                'aria-selected',
+                li.dataset.id == b.id
+            );
+
+        });
+
+}
+
+
+async function cargar(depId, barrioId) {
+
+    let r, d;
+
+    try {
+
+        r = await fetch(
+            `/api/departamentos/${depId}/riesgo`
+        );
+
+        d = await r.json();
+
+    } catch (e) {
+
+        $('resumen').textContent =
+            'No pudimos cargar los datos. Probá de nuevo en unos minutos.';
+
+        return;
+
+    }
+
+
+    if (!r.ok) {
+
+        $('resumen').textContent =
+            d.error || 'No pudimos cargar los datos.';
+
+        return;
+
+    }
+
+
+    actual = d.barrios;
+
+    capa.clearLayers();
+
+    $('lista').replaceChildren();
+
+    $('detalle').replaceChildren();
+
+
+    $('resumen').textContent = actual.length
+
+        ? `Lluvia últimos 3 días: ${d.lluvia_pasada_mm} mm · prevista próximos 3 días: ${d.lluvia_prevista_mm} mm`
+
+        : 'Todavía no hay barrios cargados para este departamento.';
+
+
+    map.setView(
+        d.centro,
+        11
+    );
+
+
+    actual.forEach(b => {
+
+        const c = L.circle(
+            [b.lat, b.lon],
+            {
+                radius: 700,
+                color: b.color,
+                fillColor: b.color,
+                fillOpacity: .55
+            }
+        ).addTo(capa);
+
+
+        c.bindTooltip(
+            `${b.nombre}: ${b.probabilidad}%`
+        );
+
+
+        c.on(
+            'click',
+            () => detalle(b)
+        );
+
+
+        const li =
+            document.createElement('li');
+
+
+        li.tabIndex = 0;
+
+        li.dataset.id = b.id;
+
+
+        li.append(
+            el('span', '', `background:${b.color}`),
+            el('span', b.nombre),
+            el('span', `${b.probabilidad}% · ${b.nivel}`)
+        );
+
+
+        li.children[0].className = 'punto';
+
+        li.children[2].className = 'pct';
+
+
+        li.onclick = () => {
+
+            map.setView(
+                [b.lat, b.lon],
+                13
+            );
+
+            detalle(b);
+
+        };
+
+
+        li.onkeydown = e => {
+
+            if (e.key === 'Enter') {
+                li.onclick();
+            }
+
+        };
+
+
+        $('lista').append(li);
+
+    });
+
+
+    const sel =
+        actual.find(
+            b => b.id === barrioId
+        );
+
+
+    if (sel) {
+        detalle(sel);
+    }
+
+}
+
+
+$('dep').onchange = e => {
+
+    if (e.target.value) {
+        cargar(e.target.value);
+    }
+
+};
+
+
+if (zona) {
+
+    $('dep').value =
+        zona.departamento_id;
+
+    cargar(
+        zona.departamento_id,
+        zona.barrio_id
+    );
+
+}
+
+</script>
+
+{% endblock %}

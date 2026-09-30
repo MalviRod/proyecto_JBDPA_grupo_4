@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block titulo %}INNUVORA · Alertas{% endblock %}
+
+{% block head %}
+<style>
+    .alertas-page { max-width: 900px; margin: auto; padding: 1.2rem; display: grid; gap: 1rem; }
+    .alertas-page h1 { margin: 0; font-size: clamp(1.7rem, 4vw, 2.5rem); }
+    .tarjeta { background: var(--superficie); border: 1px solid var(--borde); border-radius: 20px; padding: 1.2rem; box-shadow: var(--sombra); }
+    .tarjeta h2 { margin-top: 0; font-size: 1.2rem; }
+    .fila { display: flex; flex-wrap: wrap; gap: .8rem; align-items: end; }
+    .fila .campo { display: grid; gap: .3rem; flex: 1 1 180px; }
+    .fila label { font-weight: 600; }
+    .fila select, .fila input[type="number"] { padding: .7rem; border: 1px solid var(--borde); border-radius: 10px; background: var(--fondo); color: var(--texto); }
+    .lista { list-style: none; margin: 0; padding: 0; }
+    .lista li { display: flex; align-items: center; gap: .8rem; padding: .7rem .2rem; border-bottom: 1px solid var(--borde); }
+    .lista li .sep { margin-left: auto; }
+    .lista li.nueva { font-weight: 700; }
+    .suave { color: var(--texto-suave); font-size: .9rem; }
+    .btn-mini { padding: .4rem .8rem; }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<main class="alertas-page">
+
+    <header>
+        <h1>Alertas</h1>
+        <p class="suave">Elegí qué barrios querés seguir y desde qué probabilidad de inundación querés que te avisemos.</p>
+    </header>
+
+    <section class="tarjeta">
+        <h2>Nueva alerta</h2>
+        <form method="post" action="{{ url_for('alertas_suscribir') }}" class="fila">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <div class="campo">
+                <label for="dep">Departamento</label>
+                <select id="dep" required>
+                    <option value="">Elegí…</option>
+                    {% for d in deps %}<option value="{{ d.id }}">{{ d.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="campo">
+                <label for="barrio">Barrio</label>
+                <select id="barrio" name="barrio_id" required disabled>
+                    <option value="">Elegí un departamento primero</option>
+                </select>
+            </div>
+            <div class="campo">
+                <label for="umbral">Avisarme desde (%)</label>
+                <input id="umbral" name="umbral" type="number" min="10" max="90" step="5" value="50" required>
+            </div>
+            <button class="btn btn-primary">Guardar alerta</button>
+        </form>
+    </section>
+
+    <section class="tarjeta">
+        <h2>Mis alertas</h2>
+        {% if subs %}
+        <ul class="lista">
+            {% for s in subs %}
+            <li>
+                <span>{{ s.barrio }} <span class="suave">· {{ s.departamento }}</span></span>
+                <span class="sep suave">desde {{ s.umbral }}%</span>
+                <form method="post" action="{{ url_for('alertas_eliminar') }}" class="inline-form">
+                    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+                    <input type="hidden" name="barrio_id" value="{{ s.barrio_id }}">
+                    <button class="btn btn-secondary btn-mini">Quitar</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="suave">Todavía no seguís ningún barrio.</p>
+        {% endif %}
+    </section>
+
+    <section class="tarjeta">
+        <h2>Cómo recibirlas</h2>
+        <form method="post" action="{{ url_for('alertas_preferencias') }}" class="fila">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <label>
+                <input type="checkbox" name="alertas_email" {% if email_activo %}checked{% endif %}>
+                Enviarme también un email
+            </label>
+            <button class="btn btn-secondary btn-mini">Guardar</button>
+        </form>
+        {% if not smtp %}
+        <p class="suave">El envío de emails no está configurado en este servidor; las alertas se guardan igual en la bandeja de abajo.</p>
+        {% endif %}
+    </section>
+
+    <section class="tarjeta">
+        <h2>Bandeja</h2>
+        {% if notifs %}
+        <ul class="lista">
+            {% for n in notifs %}
+            <li class="{{ '' if n.leida else 'nueva' }}">
+                <span>{{ n.mensaje }}</span>
+                <span class="sep suave">{{ n.creado.strftime('%d/%m %H:%M') }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        <form method="post" action="{{ url_for('alertas_leidas') }}" style="margin-top:.8rem">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="btn btn-secondary btn-mini">Marcar todas como leídas</button>
+        </form>
+        {% else %}
+        <p class="suave">Todavía no recibiste alertas.</p>
+        {% endif %}
+    </section>
+
+</main>
+
+<script>
+    const dep = document.getElementById('dep');
+    const barrio = document.getElementById('barrio');
+
+    dep.onchange = async () => {
+
+        barrio.replaceChildren(new Option('Cargando…', ''));
+        barrio.disabled = true;
+
+        if (!dep.value) return;
+
+        try {
+
+            const r = await fetch(`/api/departamentos/${dep.value}/barrios`);
+            const lista = await r.json();
+
+            barrio.replaceChildren(
+                new Option(lista.length ? 'Elegí…' : 'Sin barrios cargados', '')
+            );
+
+            lista.forEach(b => barrio.append(new Option(b.nombre, b.id)));
+
+            barrio.disabled = !lista.length;
+
+        } catch (e) {
+
+            barrio.replaceChildren(new Option('No se pudo cargar', ''));
+
+        }
+    };
+</script>
+{% endblock %}

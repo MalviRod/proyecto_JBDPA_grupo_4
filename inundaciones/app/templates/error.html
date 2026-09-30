@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block titulo %}INNUVORA · Error {{ codigo }}{% endblock %}
+
+{% block contenido %}
+<main style="min-height: 50vh; display: grid; place-items: center; padding: 3rem 1rem; text-align: center;">
+    <section>
+        <h1 style="font-size: 3rem; margin: 0;">{{ codigo }}</h1>
+        <p style="color: var(--texto-suave);">{{ mensaje }}</p>
+        <a href="{{ url_for('inicio') }}" class="btn btn-primary">Volver al inicio</a>
+    </section>
+</main>
+{% endblock %}
