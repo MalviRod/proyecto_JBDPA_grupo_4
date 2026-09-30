@@ -13,7 +13,7 @@
 | RF-09 | Envío de alertas | Cuando el riesgo de un barrio seguido supera el umbral se genera una notificación en la bandeja y, si hay SMTP configurado, un email. No se repite el aviso salvo que el nivel empeore o pasen 24 h. |
 | RF-10 | Historial de inundaciones | Se consulta por barrio, ordenado por fecha descendente. |
 | RF-11 | Administración | Solo el rol admin carga eventos al historial (barrio existente, fecha AAAA-MM-DD no futura). |
-| RF-12 | Información preventiva | La página de inicio muestra recomendaciones para antes, durante y después de una inundación. |
+| RF-12 | Información preventiva | La página de inicio muestra recomendaciones para antes de una inundación. |
 
 Pendiente (fuera de esta versión): gestión del perfil (cambiar nombre, email o contraseña).
 
